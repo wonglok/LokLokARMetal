@@ -25,9 +25,23 @@ let kMaxBuffersInFlight: Int = 3
 // The max number anchors our uniform buffer will hold
 let kMaxAnchorInstanceCount: Int = 64
 
+// The max number firework our firework info will hold
+let kMaxFireworkInstnaceCount: Int = 8
+let kNumberOfParticlePerFireworkCount: Int = 1024 * 4
+let kParticleCount: Int = kNumberOfParticlePerFireworkCount * kMaxFireworkInstnaceCount
+
 // The 16 byte aligned size of our uniform structures
-let kAlignedSharedUniformsSize: Int = (MemoryLayout<SharedUniforms>.size & ~0xFF) + 0x100
-let kAlignedInstanceUniformsSize: Int = ((MemoryLayout<InstanceUniforms>.size * kMaxAnchorInstanceCount) & ~0xFF) + 0x100
+func alignByte (_ size: Int) -> Int {
+    return (size & ~0xFF) + 0x100
+}
+
+let kAlignedSharedUniformsSize: Int = alignByte(MemoryLayout<SharedUniforms>.size)
+let kAlignedInstanceUniformsSize: Int = alignByte(MemoryLayout<InstanceUniforms>.size * kMaxAnchorInstanceCount)
+
+let kAlignedParticleSharedUniformsSize: Int = alignByte(MemoryLayout<SharedFireworkUniforms>.size)
+let kAlignedFireworkBufferLength: Int = alignByte(MemoryLayout<Particle>.size * kNumberOfParticlePerFireworkCount)
+let kAlignedParticleBufferSize: Int = alignByte(MemoryLayout<Particle>.size * kNumberOfParticlePerFireworkCount * kMaxFireworkInstnaceCount)
+
 
 // Vertex data for an image plane
 let kImagePlaneVertexData: [Float] = [
@@ -36,7 +50,6 @@ let kImagePlaneVertexData: [Float] = [
     -1.0,  1.0,  0.0, 0.0,
     1.0,  1.0,  1.0, 0.0,
 ]
-
 
 class Renderer {
     let session: ARSession
@@ -82,6 +95,11 @@ class Renderer {
     // Addresses to write anchor uniforms to each frame
     var anchorUniformBufferAddress: UnsafeMutableRawPointer!
     
+    // make the address for particles
+    var fireworkParticleBufferInAddress: UnsafeMutableRawPointer!
+    var fireworkParticleBufferOutAddress: UnsafeMutableRawPointer!
+    var fireworkUniformBufferAddresses: UnsafeMutableRawPointer!
+    
     // The number of anchor instances to render
     var anchorInstanceCount: Int = 0
     
@@ -92,12 +110,21 @@ class Renderer {
     var viewportSizeDidChange: Bool = false
     
     
+    // Firewokr: - Firework Instance Stuff
+    var fireworkComputePipelineState: MTLComputePipelineState!
+    var fireworkRenderPipelineState: MTLRenderPipelineState!
+    
     init(session: ARSession, metalDevice device: MTLDevice, renderDestination: RenderDestinationProvider) {
         self.session = session
         self.device = device
         self.renderDestination = renderDestination
         loadMetal()
         loadAssets()
+        
+        loadFireworkCompute()
+        loadFireworkRender()
+        updateBufferStates()
+        initParticleData()
     }
     
     func drawRectResized(size: CGSize) {
@@ -105,10 +132,15 @@ class Renderer {
         viewportSizeDidChange = true
     }
     
+    
+    
+    
     func update() {
         // Wait to ensure only kMaxBuffersInFlight are getting proccessed by any stage in the Metal
         //   pipeline (App, Metal, Drivers, GPU, etc)
         let _ = inFlightSemaphore.wait(timeout: DispatchTime.distantFuture)
+        
+        computeFirework(commandQueue: commandQueue)
         
         // Create a new command buffer for each renderpass to the current drawable
         if let commandBuffer = commandQueue.makeCommandBuffer() {
@@ -133,26 +165,160 @@ class Renderer {
             updateBufferStates()
             updateGameState()
             
-            if let renderPassDescriptor = renderDestination.currentRenderPassDescriptor, let currentDrawable = renderDestination.currentDrawable, let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
+            if
+                let renderPassDescriptor = renderDestination.currentRenderPassDescriptor,
+                let currentDrawable = renderDestination.currentDrawable,
+                let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
                 
                 renderEncoder.label = "MyRenderEncoder"
                 
                 drawCapturedImage(renderEncoder: renderEncoder)
                 drawAnchorGeometry(renderEncoder: renderEncoder)
+                drawFirework(renderEncoder: renderEncoder)
+                
+                
                 
                 // We're done encoding commands
                 renderEncoder.endEncoding()
                 
                 // Schedule a present once the framebuffer is complete using the current drawable
                 commandBuffer.present(currentDrawable)
+                
             }
             
             // Finalize rendering here & push the command buffer to the GPU
             commandBuffer.commit()
+//            commandBuffer.waitUntilCompleted()
+            
+            
+//            if let currentDrawable = renderDestination.currentDrawable,
+//               let renderPassDescriptor = renderDestination.currentRenderPassDescriptor {
+//                drawFirework(commandQueue: commandQueue, renderPassDescriptor: renderPassDescriptor, drawable: currentDrawable)
+//            }
+        }
+    }
+    // MARK: - Private
+    
+    var fireworkUniformBuffer: MTLBuffer!
+    var fireworkParticleBufferIn: MTLBuffer!
+    var fireworkParticleBufferOut: MTLBuffer!
+    
+    func loadFireworkCompute () {
+        // Load all the shader files with a metal file extension in the project
+        let defaultLibrary = device.makeDefaultLibrary()!
+
+        let fireworkComputeShader = defaultLibrary.makeFunction(name: "fireworkComputeShader")
+        fireworkComputePipelineState = try! device.makeComputePipelineState(function: fireworkComputeShader!)
+        
+        let particleBufferSize = kAlignedParticleBufferSize * kMaxBuffersInFlight
+        let fireowrkUniformBufferSize = kAlignedParticleSharedUniformsSize * kMaxBuffersInFlight
+        
+        fireworkParticleBufferIn = device.makeBuffer(length: particleBufferSize, options: .storageModeShared)
+        fireworkParticleBufferIn.label = "FireworkPartcleBufferIn"
+        
+        fireworkParticleBufferOut = device.makeBuffer(length: particleBufferSize, options: .storageModeShared)
+        fireworkParticleBufferOut.label = "FireworkPartcleBufferOut"
+        
+        fireworkUniformBuffer = device.makeBuffer(length: fireowrkUniformBufferSize, options: .storageModeShared)
+        fireworkUniformBuffer.label = "SharedFireworkUniformBuffer"
+    }
+    
+    func initParticleData () {
+        
+        
+        for index in 0..<kParticleCount-1 {
+            //updateBufferStates()
+            let particleInInfo = fireworkParticleBufferInAddress.assumingMemoryBound(to: Particle.self).advanced(by: index)
+            particleInInfo.pointee = setEachParticle(Particle())
+        
+            let particleOutInfo = fireworkParticleBufferOutAddress.assumingMemoryBound(to: Particle.self).advanced(by: index)
+            particleOutInfo.pointee = setEachParticle(Particle())
         }
     }
     
-    // MARK: - Private
+    func setEachParticle (_ eP: Particle) -> Particle{
+        var eachParticle = eP
+        eachParticle.position = vector_float3(
+            (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
+            (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
+            (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0
+        )
+        eachParticle.startPos = vector_float3(
+            (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
+            (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
+            (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0
+        )
+        eachParticle.mass = 0.15
+        return eachParticle
+    }
+    
+    func computeFirework (commandQueue: MTLCommandQueue) {
+        if let commandBuffer = commandQueue.makeCommandBuffer() {
+            if let computeEncoder = commandBuffer.makeComputeCommandEncoder() {
+                
+                let nowOutBuff = getFireworkParticleBufferOut()
+                let nowInBuff = getFireworkParticleBufferIn()
+                
+                computeEncoder.setComputePipelineState(fireworkComputePipelineState!)
+                computeEncoder.setBuffer(nowInBuff, offset: 0, index: 0)
+                computeEncoder.setBuffer(nowOutBuff, offset: 0, index: 1)
+                computeEncoder.setBuffer(fireworkUniformBuffer, offset: 0, index: 2)
+                
+                let threadGroupCount = MTLSize(width:32, height:1, depth:1)
+                let threadGroups = MTLSize(width:(kParticleCount + 31) / 32, height:1, depth:1)
+                
+                computeEncoder.dispatchThreadgroups(threadGroups, threadsPerThreadgroup: threadGroupCount)
+                
+                computeEncoder.endEncoding()
+                
+                commandBuffer.commit()
+                commandBuffer.waitUntilCompleted()
+                
+//                let result = nowOutBuff.contents().bindMemory(to: Particle.self, capacity: kParticleCount)
+//                var data = [Particle]()
+//                for i in 0...kParticleCount-1{
+//                    data.append(result[i])
+//                }
+//                print(data[0])
+            }
+        }
+    }
+    
+    func loadFireworkRender () {
+        let defaultLibrary = device.makeDefaultLibrary()!
+        let fragmentProgram = defaultLibrary.makeFunction(name: "particle_fragment")
+        let vertexProgram = defaultLibrary.makeFunction(name: "particle_vertex")
+        
+        // 2
+        let pipelineStateDescriptor = MTLRenderPipelineDescriptor()
+        pipelineStateDescriptor.vertexFunction = vertexProgram
+        pipelineStateDescriptor.fragmentFunction = fragmentProgram
+//        pipelineStateDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        
+        pipelineStateDescriptor.colorAttachments[0].pixelFormat = renderDestination.colorPixelFormat
+        pipelineStateDescriptor.depthAttachmentPixelFormat = renderDestination.depthStencilPixelFormat
+        pipelineStateDescriptor.stencilAttachmentPixelFormat = renderDestination.depthStencilPixelFormat
+        
+        fireworkRenderPipelineState = try! device.makeRenderPipelineState(descriptor: pipelineStateDescriptor)
+    }
+    
+//    func drawFirework (commandQueue: MTLCommandQueue, renderPassDescriptor: MTLRenderPassDescriptor, drawable: CAMetalDrawable) {
+    func drawFirework (renderEncoder: MTLRenderCommandEncoder) {
+        let nowOutBuff = getFireworkParticleBufferOut()
+        
+        renderEncoder.setCullMode(.back)
+        renderEncoder.setRenderPipelineState(fireworkRenderPipelineState)
+        renderEncoder.setDepthStencilState(anchorDepthState)
+        
+        // Set any buffers fed into our render pipeline
+        
+        renderEncoder.setVertexBuffer(nowOutBuff, offset: 0, index: 0)
+        renderEncoder.setVertexBuffer(sharedUniformBuffer, offset: sharedUniformBufferOffset, index: 1)
+        
+        renderEncoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: kNumberOfParticlePerFireworkCount)
+        
+    }
+    
     
     func loadMetal() {
         // Create and load our basic Metal state objects
@@ -293,6 +459,7 @@ class Renderer {
         
         // Create the command queue
         commandQueue = device.makeCommandQueue()
+        
     }
     
     func loadAssets() {
@@ -326,9 +493,27 @@ class Renderer {
         }
     }
     
+    func getFireworkParticleBufferIn () -> MTLBuffer {
+        if (uniformBufferIndex % 2 == 0) {
+            return fireworkParticleBufferIn
+        } else {
+            return fireworkParticleBufferOut
+        }
+    }
+    func getFireworkParticleBufferOut () -> MTLBuffer {
+        if (uniformBufferIndex % 2 == 0) {
+            return fireworkParticleBufferOut
+        } else {
+            return fireworkParticleBufferIn
+        }
+    }
+    
     func updateBufferStates() {
         // Update the location(s) to which we'll write to in our dynamically changing Metal buffers for
         //   the current frame (i.e. update our slot in the ring buffer used for the current frame)
+        
+        let nowBuffIn = getFireworkParticleBufferIn()
+        let nowBuffOut = getFireworkParticleBufferOut()
         
         uniformBufferIndex = (uniformBufferIndex + 1) % kMaxBuffersInFlight
         
@@ -337,6 +522,11 @@ class Renderer {
         
         sharedUniformBufferAddress = sharedUniformBuffer.contents().advanced(by: sharedUniformBufferOffset)
         anchorUniformBufferAddress = anchorUniformBuffer.contents().advanced(by: anchorUniformBufferOffset)
+        
+        fireworkParticleBufferInAddress = nowBuffIn.contents()
+        fireworkParticleBufferOutAddress = nowBuffOut.contents()
+   
+        fireworkUniformBufferAddresses = fireworkUniformBuffer.contents().advanced(by: kAlignedParticleSharedUniformsSize * uniformBufferIndex)
     }
     
     func updateGameState() {
@@ -352,7 +542,6 @@ class Renderer {
         
         if viewportSizeDidChange {
             viewportSizeDidChange = false
-            
             updateImagePlane(frame: currentFrame)
         }
     }

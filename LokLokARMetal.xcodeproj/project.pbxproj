@@ -41,6 +41,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		E207ADC91F37255800884E64 /* Firework */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Firework;
+			sourceTree = "<group>";
+		};
 		E270CB4D1F32C722000896FB = {
 			isa = PBXGroup;
 			children = (
@@ -60,6 +67,7 @@
 		E270CB581F32C722000896FB /* LokLokARMetal */ = {
 			isa = PBXGroup;
 			children = (
+				E207ADC91F37255800884E64 /* Firework */,
 				E270CB591F32C722000896FB /* AppDelegate.swift */,
 				E270CB5B1F32C722000896FB /* Shaders.metal */,
 				E270CB5D1F32C722000896FB /* ShaderTypes.h */,
@@ -287,6 +295,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				DEVELOPMENT_TEAM = 6FDQ7639HM;
 				INFOPLIST_FILE = LokLokARMetal/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.wonglok.LokLokARMetal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -302,6 +311,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				DEVELOPMENT_TEAM = 6FDQ7639HM;
 				INFOPLIST_FILE = LokLokARMetal/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.wonglok.LokLokARMetal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -330,6 +340,7 @@
 				E270CB701F32C722000896FB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

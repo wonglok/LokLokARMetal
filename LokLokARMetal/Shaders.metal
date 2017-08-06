@@ -166,3 +166,116 @@ fragment float4 anchorGeometryFragmentLighting(ColorInOut in [[stage_in]],
     // colorMap for this fragment's alpha value
     return float4(color, in.color.w);
 }
+
+float constrain(float val, float min, float max) {
+    if (val < min) {
+        return min;
+    } else if (val > max) {
+        return max;
+    } else {
+        return val;
+    }
+}
+
+Particle slowDown(Particle thisParticle) {
+    thisParticle.velocity[0] *= 0.995;
+    thisParticle.velocity[1] *= 0.995;
+    thisParticle.velocity[2] *= 0.995;
+    return thisParticle;
+}
+
+kernel void fireworkComputeShader(
+                                   device Particle *in [[ buffer(0) ]],
+                                   device Particle *out [[ buffer(1) ]],
+                                   const device SharedFireworkUniforms &uniforms [[ buffer(2) ]],
+                                   uint id [[thread_position_in_grid]])
+{
+    bool isHead = (id % 2 == 0);
+    Particle thisParticle = in[id];
+    Particle mouse;
+    mouse.position = float3(0.0);
+    mouse.mass = 3.5;
+    
+    if (isHead) {
+        float3 diff;
+        
+        diff = thisParticle.position - (mouse.position);
+        // diff = thisParticle.position - float3(0.0);
+
+        float distance = constrain(length(diff), 10.0, 70.0);
+        float strength = thisParticle.mass * mouse.mass / (distance * distance);
+
+        diff = normalize(diff);
+        diff = diff * strength * -0.083;
+        
+        thisParticle.velocity = thisParticle.velocity + diff;
+        thisParticle.position = thisParticle.position + thisParticle.velocity;
+        
+        if (thisParticle.position[0] > 1.0 || thisParticle.position[0] < -1.0 ) {
+            thisParticle = slowDown(thisParticle);
+        } else if (thisParticle.position[1] > 1.0 || thisParticle.position[1] < -1.0 ) {
+            thisParticle = slowDown(thisParticle);
+        } else if (thisParticle.position[2] > 1.0 || thisParticle.position[2] < -1.0 ) {
+            thisParticle = slowDown(thisParticle);
+        }
+    } else {
+        Particle headParticle = in[id - 1];
+        thisParticle.position = headParticle.position - headParticle.velocity * 2.5;
+    }
+    
+    //mass
+    out[id].position = thisParticle.position;
+    out[id].velocity = thisParticle.velocity;
+    out[id].mass = thisParticle.mass;
+}
+
+
+struct VertexOut {
+    float4 position [[position]];
+    float pointsize [[point_size]];
+    float3 color;
+};
+
+vertex VertexOut particle_vertex(                           // 1
+                                 device Particle *inParticle [[ buffer(0) ]], // 2
+                                 constant SharedUniforms &uniforms [[ buffer(1) ]],
+                                 unsigned int id [[ vertex_id ]]) {                 // 3
+    
+    
+    float4x4 mv_Matrix = uniforms.viewMatrix;
+    float4x4 proj_Matrix = uniforms.projectionMatrix;
+    
+    Particle thisParticle = inParticle[id];
+    VertexOut VertexOut;
+    
+//    VertexOut.position = proj_Matrix * mv_Matrix * float4(thisParticle.position, 1.0);
+    VertexOut.position = proj_Matrix * mv_Matrix * float4(thisParticle.position, 1.0);
+    VertexOut.pointsize = 1.0;
+    VertexOut.color = thisParticle.velocity;
+    
+    return VertexOut;              // 4
+}
+
+
+fragment half4 particle_fragment(
+                                 VertexOut         interpolated       [[stage_in]]
+                                 ) {
+    
+    interpolated.color *= 100.0;
+    
+    if (interpolated.color.x < 0.5) {
+        interpolated.color.x += 0.35;
+    }
+    if (interpolated.color.y < 0.5) {
+        interpolated.color.y += 0.35;
+    }
+    if (interpolated.color.z < 0.5) {
+        interpolated.color.z += 0.35;
+    }
+    
+    return half4(
+                 interpolated.color.x,
+                 interpolated.color.y,
+                 interpolated.color.z, 1.0);
+}
+

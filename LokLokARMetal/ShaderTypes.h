@@ -60,4 +60,17 @@ typedef struct {
     matrix_float4x4 modelMatrix;
 } InstanceUniforms;
 
+
+typedef struct {
+    vector_float3 position;
+    vector_float3 velocity;
+    float mass;
+    vector_float3 startPos;
+} Particle;
+
+typedef struct {
+    int renderMode;
+    Particle mouse;
+} SharedFireworkUniforms;
+
 #endif /* ShaderTypes_h */
