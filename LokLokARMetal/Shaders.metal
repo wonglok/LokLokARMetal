@@ -178,9 +178,9 @@ float constrain(float val, float min, float max) {
 }
 
 Particle slowDown(Particle thisParticle) {
-    thisParticle.velocity[0] *= 0.995;
-    thisParticle.velocity[1] *= 0.995;
-    thisParticle.velocity[2] *= 0.995;
+    thisParticle.velocity[0] *= 0.955;
+    thisParticle.velocity[1] *= 0.955;
+    thisParticle.velocity[2] *= 0.955;
     return thisParticle;
 }
 
@@ -194,14 +194,14 @@ Particle speedUp(Particle thisParticle) {
 kernel void fireworkComputeShader(
                                    device Particle *in [[ buffer(0) ]],
                                    device Particle *out [[ buffer(1) ]],
-                                   const device SharedFireworkUniforms &uniforms [[ buffer(2) ]],
+                                  const device SharedFireworkUniforms &uniforms [[ buffer(2) ]],
+                                  const device SharedUniforms &sharedUniforms [[ buffer(3) ]],
                                    uint id [[thread_position_in_grid]])
 {
     bool isHead = (id % 2 == 0);
     Particle thisParticle = in[id];
     Particle mouse;
     mouse.position = uniforms.mouse.position;
-//    mouse.position = thisParticle.startPos * 0.001;
     mouse.mass = 1.5;
     
     if (isHead) {
@@ -216,13 +216,16 @@ kernel void fireworkComputeShader(
         diff = normalize(diff);
         diff = diff * strength * -0.083;
         
-        if (distance > 15.0) {
-            thisParticle = slowDown(thisParticle);
-        }
-        
         thisParticle.velocity = thisParticle.velocity + diff;
         thisParticle.position = thisParticle.position + thisParticle.velocity;
         
+        if (distance > 15 || length(diff) > 0.5) {
+            thisParticle = slowDown(thisParticle);
+        }
+//        if (length(diff) > 0.5) {
+//            thisParticle = slowDown(thisParticle);
+//        }
+
     } else {
         Particle headParticle = in[id - 1];
         thisParticle.position = headParticle.position - headParticle.velocity * 2.0;
