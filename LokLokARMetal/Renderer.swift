@@ -548,15 +548,18 @@ class Renderer {
     }
     
     func updateSharedUniforms(frame: ARFrame) {
-        let sharedFireworkUniformPtr = fireworkUniformBufferAddresses.assumingMemoryBound(to: SharedFireworkUniforms.self)
-        let newCoordinates = frame.camera.transform * vector_float4(0.0, 0.0, 0.0, 1.0)
+        var translation = matrix_identity_float4x4
+        translation.columns.3.z = -1.5
+        let transform = simd_mul(frame.camera.transform, translation)
+        let newCoordinates = transform * vector_float4(0.0, 0.0, 0.0, 1.0)
 
+        let sharedFireworkUniformPtr = fireworkUniformBufferAddresses.assumingMemoryBound(to: SharedFireworkUniforms.self)
         sharedFireworkUniformPtr.pointee.mouse.position = vector_float3(
             newCoordinates.x,
             newCoordinates.y,
-            newCoordinates.z - 2.0
+            newCoordinates.z
         )
-        
+
         // Update the shared uniforms of the frame
         let uniforms = sharedUniformBufferAddress.assumingMemoryBound(to: SharedUniforms.self)
         
