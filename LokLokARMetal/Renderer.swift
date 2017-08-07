@@ -571,7 +571,7 @@ class Renderer {
     
     func updateSharedUniforms(frame: ARFrame) {
         var translation = matrix_identity_float4x4
-        translation.columns.3.z = -1.5
+        translation.columns.3.z = -2.5
         let transform = simd_mul(frame.camera.transform, translation)
         let newCoordinates = transform * vector_float4(0.0, 0.0, 0.0, 1.0)
 
@@ -581,8 +581,6 @@ class Renderer {
             newCoordinates.y,
             newCoordinates.z
         )
-        
-        
         
         // Update the shared uniforms of the frame
         let uniforms = sharedUniformBufferAddress.assumingMemoryBound(to: SharedUniforms.self)

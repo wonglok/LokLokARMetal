@@ -216,16 +216,15 @@ kernel void fireworkComputeShader(
         diff = normalize(diff);
         diff = diff * strength * -0.083;
         
-        thisParticle.velocity = thisParticle.velocity + diff;
+        thisParticle.velocity = thisParticle.velocity + diff * 0.78;
         thisParticle.position = thisParticle.position + thisParticle.velocity;
         
         if (distance > 15 || length(diff) > 0.5) {
             thisParticle = slowDown(thisParticle);
+        } else {
+            thisParticle = speedUp(thisParticle);
         }
-//        if (length(diff) > 0.5) {
-//            thisParticle = slowDown(thisParticle);
-//        }
-
+    
     } else {
         Particle headParticle = in[id - 1];
         thisParticle.position = headParticle.position - headParticle.velocity * 2.0;
