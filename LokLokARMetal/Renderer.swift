@@ -27,7 +27,7 @@ let kMaxAnchorInstanceCount: Int = 64
 
 // The max number firework our firework info will hold
 let kMaxFireworkInstnaceCount: Int = 1
-let kNumberOfParticlePerFireworkCount: Int = 1024 * 1
+let kNumberOfParticlePerFireworkCount: Int = 1024 * 32
 let kParticleCount: Int = kNumberOfParticlePerFireworkCount * kMaxFireworkInstnaceCount
 
 // The 16 byte aligned size of our uniform structures
@@ -314,7 +314,7 @@ class Renderer {
         renderEncoder.setVertexBuffer(sharedUniformBuffer, offset: sharedUniformBufferOffset, index: 1)
 //        renderEncoder.setVertexBuffer(anchorUniformBuffer, offset: anchorUniformBufferOffset, index: 2)
         
-        renderEncoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: kNumberOfParticlePerFireworkCount)
+        renderEncoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: kParticleCount)
         
     }
     

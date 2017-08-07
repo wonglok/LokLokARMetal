@@ -184,6 +184,13 @@ Particle slowDown(Particle thisParticle) {
     return thisParticle;
 }
 
+Particle speedUp(Particle thisParticle) {
+    thisParticle.velocity[0] *= 1.1;
+    thisParticle.velocity[1] *= 1.1;
+    thisParticle.velocity[2] *= 1.1;
+    return thisParticle;
+}
+
 kernel void fireworkComputeShader(
                                    device Particle *in [[ buffer(0) ]],
                                    device Particle *out [[ buffer(1) ]],
@@ -194,7 +201,8 @@ kernel void fireworkComputeShader(
     Particle thisParticle = in[id];
     Particle mouse;
     mouse.position = uniforms.mouse.position;
-    mouse.mass = 3.5;
+//    mouse.position = thisParticle.startPos * 0.001;
+    mouse.mass = 1.5;
     
     if (isHead) {
         float3 diff;
@@ -202,27 +210,20 @@ kernel void fireworkComputeShader(
         diff = thisParticle.position - (mouse.position);
         // diff = thisParticle.position - float3(0.0);
 
-        float distance = constrain(length(diff), 10.0, 70.0);
+        float distance = constrain(length(diff), 10.0, 50.0);
         float strength = thisParticle.mass * mouse.mass / (distance * distance);
 
         diff = normalize(diff);
         diff = diff * strength * -0.083;
         
-        thisParticle.velocity = thisParticle.velocity + diff * 2.0;
+        thisParticle.velocity = thisParticle.velocity + diff;
         thisParticle.position = thisParticle.position + thisParticle.velocity;
         
-//        float factor = 1.0;
-//
-//        if (thisParticle.position[0] > 1.0 * factor || thisParticle.position[0] < -1.0 * factor ) {
-//            thisParticle = slowDown(thisParticle);
-//        } else if (thisParticle.position[1] > 1.0 * factor || thisParticle.position[1] < -1.0 * factor ) {
-//            thisParticle = slowDown(thisParticle);
-//        } else if (thisParticle.position[2] > 1.0 * factor || thisParticle.position[2] < -1.0 * factor ) {
-//            thisParticle = slowDown(thisParticle);
-//        }
+//        thisParticle = slowDown(thisParticle);
+        
     } else {
         Particle headParticle = in[id - 1];
-        thisParticle.position = headParticle.position - headParticle.velocity * 2.5;
+        thisParticle.position = headParticle.position - headParticle.velocity;
     }
     
     //mass
