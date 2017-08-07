@@ -27,7 +27,7 @@ let kMaxAnchorInstanceCount: Int = 64
 
 // The max number firework our firework info will hold
 let kMaxFireworkInstnaceCount: Int = 1
-let kNumberOfParticlePerFireworkCount: Int = 1024 * 32
+let kNumberOfParticlePerFireworkCount: Int = 1024 * 16
 let kParticleCount: Int = kNumberOfParticlePerFireworkCount * kMaxFireworkInstnaceCount
 
 // The 16 byte aligned size of our uniform structures
@@ -240,12 +240,12 @@ class Renderer {
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0
-        )
+        ) * vector_float3(0.5)
         eachParticle.startPos = vector_float3(
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0
-        )
+        ) * vector_float3(0.5)
         eachParticle.mass = 0.15
         return eachParticle
     }
