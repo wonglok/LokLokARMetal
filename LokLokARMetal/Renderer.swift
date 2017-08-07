@@ -26,8 +26,8 @@ let kMaxBuffersInFlight: Int = 3
 let kMaxAnchorInstanceCount: Int = 64
 
 // The max number firework our firework info will hold
-let kMaxFireworkInstnaceCount: Int = 8
-let kNumberOfParticlePerFireworkCount: Int = 1024 * 4
+let kMaxFireworkInstnaceCount: Int = 1
+let kNumberOfParticlePerFireworkCount: Int = 1024 * 1
 let kParticleCount: Int = kNumberOfParticlePerFireworkCount * kMaxFireworkInstnaceCount
 
 // The 16 byte aligned size of our uniform structures
@@ -234,7 +234,7 @@ class Renderer {
         }
     }
     
-    func setEachParticle (_ eP: Particle) -> Particle{
+    func setEachParticle (_ eP: Particle) -> Particle {
         var eachParticle = eP
         eachParticle.position = vector_float3(
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
@@ -312,6 +312,7 @@ class Renderer {
         
         renderEncoder.setVertexBuffer(nowOutBuff, offset: 0, index: 0)
         renderEncoder.setVertexBuffer(sharedUniformBuffer, offset: sharedUniformBufferOffset, index: 1)
+//        renderEncoder.setVertexBuffer(anchorUniformBuffer, offset: anchorUniformBufferOffset, index: 2)
         
         renderEncoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: kNumberOfParticlePerFireworkCount)
         
@@ -599,7 +600,6 @@ class Renderer {
             coordinateSpaceTransform.columns.2.z = -1.0
             
             let modelMatrix = simd_mul(anchor.transform, coordinateSpaceTransform)
-            let viewMatrix = simd_inverse(frame.camera.transform)
             
             let anchorUniforms = anchorUniformBufferAddress.assumingMemoryBound(to: InstanceUniforms.self).advanced(by: index)
             anchorUniforms.pointee.modelMatrix = modelMatrix
