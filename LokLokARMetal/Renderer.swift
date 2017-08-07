@@ -126,10 +126,7 @@ class Renderer {
         updateBufferStates()
 //        initParticleData()
         
-        if (!particlesAreSetup) {
-            particlesAreSetup = true
-            initParticleData()
-        }
+       
     }
     
     func drawRectResized(size: CGSize) {
@@ -227,47 +224,45 @@ class Renderer {
     }
     
     var particlesAreSetup = false;
-    func initParticleData () {
+    func initParticleData (transform: float4x4) {
         for index in 0..<kParticleCount-1 {
             //updateBufferStates()
             let particleInInfo = fireworkParticleBufferInAddress.assumingMemoryBound(to: Particle.self).advanced(by: index)
-            particleInInfo.pointee = setEachParticle(Particle())
+            particleInInfo.pointee = setEachParticle(Particle(), transform: transform)
         
             let particleOutInfo = fireworkParticleBufferOutAddress.assumingMemoryBound(to: Particle.self).advanced(by: index)
-            particleOutInfo.pointee = setEachParticle(Particle())
+            particleOutInfo.pointee = setEachParticle(Particle(), transform: transform)
         }
     }
-    
-//    func getRand () -> float {
-//        return (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0
-//    }
-    
-    func setEachParticle (_ eP: Particle) -> Particle {
+
+    func setEachParticle (_ eP: Particle, transform: float4x4) -> Particle {
         var eachParticle = eP
         eachParticle.position = vector_float3(
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0
-            ) * vector_float3(0.5)
+            )
         eachParticle.startPos = vector_float3(
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0,
             (Float(arc4random_uniform(100000000)) / Float(100000000)) * 2.0 - 1.0
-            ) * vector_float3(0.5)
+            )
         
         eachParticle.mass = 0.15
+    
+   
+        let newPos = transform * float4(eachParticle.position.x, eachParticle.position.y, eachParticle.position.z, 1.0)
+        let newPos2 = transform * float4(eachParticle.startPos.x, eachParticle.startPos.y, eachParticle.startPos.z, 1.0)
         
-//        let newPos = transform * float4(eachParticle.position.x, eachParticle.position.y, eachParticle.position.z, 1.0)
-//        let newPos2 = transform * float4(eachParticle.startPos.x, eachParticle.startPos.y, eachParticle.startPos.z, 1.0)
-//
-//        eachParticle.position.x = newPos.x
-//        eachParticle.position.y = newPos.y
-//        eachParticle.position.z = newPos.z
-//
-//        eachParticle.startPos.x = newPos2.x
-//        eachParticle.startPos.y = newPos2.y
-//        eachParticle.startPos.z = newPos2.z
-//
+        eachParticle.position.x = newPos.x
+        eachParticle.position.y = newPos.y
+        eachParticle.position.z = newPos.z
+        
+        eachParticle.startPos.x = newPos2.x
+        eachParticle.startPos.y = newPos2.y
+        eachParticle.startPos.z = newPos2.z
+   
+        
         return eachParticle
     }
     
@@ -569,10 +564,24 @@ class Renderer {
         }
     }
     
+    func setTimeout(_ delay:TimeInterval, block:@escaping ()->Void) -> Timer {
+        return Timer.scheduledTimer(timeInterval: delay, target: BlockOperation(block: block), selector: #selector(Operation.main), userInfo: nil, repeats: false)
+    }
+    
+    func goReset () {
+        let sharedFireworkUniformPtr = fireworkUniformBufferAddresses.assumingMemoryBound(to: SharedFireworkUniforms.self)
+        sharedFireworkUniformPtr.pointee.renderMode = -1
+        
+        setTimeout(1/60) {
+            sharedFireworkUniformPtr.pointee.renderMode = 0
+        }
+    }
+    
     func updateSharedUniforms(frame: ARFrame) {
         var translation = matrix_identity_float4x4
         translation.columns.3.z = -2.5
         let transform = simd_mul(frame.camera.transform, translation)
+        
         let newCoordinates = transform * vector_float4(0.0, 0.0, 0.0, 1.0)
 
         let sharedFireworkUniformPtr = fireworkUniformBufferAddresses.assumingMemoryBound(to: SharedFireworkUniforms.self)
@@ -581,6 +590,11 @@ class Renderer {
             newCoordinates.y,
             newCoordinates.z
         )
+        
+        if (!particlesAreSetup) {
+            particlesAreSetup = true
+            initParticleData(transform: transform)
+        }
         
         // Update the shared uniforms of the frame
         let uniforms = sharedUniformBufferAddress.assumingMemoryBound(to: SharedUniforms.self)
