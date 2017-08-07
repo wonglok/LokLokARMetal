@@ -572,6 +572,12 @@ class Renderer {
         let sharedFireworkUniformPtr = fireworkUniformBufferAddresses.assumingMemoryBound(to: SharedFireworkUniforms.self)
         sharedFireworkUniformPtr.pointee.renderMode = -1
         
+        var translation = matrix_identity_float4x4
+        translation.columns.3.z = -2.5
+        let transform = simd_mul((session.currentFrame?.camera.transform)!, translation)
+        
+        initParticleData(transform: transform)
+        
         setTimeout(1/60) {
             sharedFireworkUniformPtr.pointee.renderMode = 0
         }
