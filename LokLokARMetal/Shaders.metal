@@ -193,7 +193,7 @@ kernel void fireworkComputeShader(
     bool isHead = (id % 2 == 0);
     Particle thisParticle = in[id];
     Particle mouse;
-    mouse.position = float3(0.0);
+    mouse.position = uniforms.mouse.position;
     mouse.mass = 3.5;
     
     if (isHead) {
@@ -208,16 +208,18 @@ kernel void fireworkComputeShader(
         diff = normalize(diff);
         diff = diff * strength * -0.083;
         
-        thisParticle.velocity = thisParticle.velocity + diff;
+        thisParticle.velocity = thisParticle.velocity + diff * 2.0;
         thisParticle.position = thisParticle.position + thisParticle.velocity;
         
-        if (thisParticle.position[0] > 1.0 || thisParticle.position[0] < -1.0 ) {
-            thisParticle = slowDown(thisParticle);
-        } else if (thisParticle.position[1] > 1.0 || thisParticle.position[1] < -1.0 ) {
-            thisParticle = slowDown(thisParticle);
-        } else if (thisParticle.position[2] > 1.0 || thisParticle.position[2] < -1.0 ) {
-            thisParticle = slowDown(thisParticle);
-        }
+//        float factor = 1.0;
+//
+//        if (thisParticle.position[0] > 1.0 * factor || thisParticle.position[0] < -1.0 * factor ) {
+//            thisParticle = slowDown(thisParticle);
+//        } else if (thisParticle.position[1] > 1.0 * factor || thisParticle.position[1] < -1.0 * factor ) {
+//            thisParticle = slowDown(thisParticle);
+//        } else if (thisParticle.position[2] > 1.0 * factor || thisParticle.position[2] < -1.0 * factor ) {
+//            thisParticle = slowDown(thisParticle);
+//        }
     } else {
         Particle headParticle = in[id - 1];
         thisParticle.position = headParticle.position - headParticle.velocity * 2.5;

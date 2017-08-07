@@ -173,10 +173,8 @@ class Renderer {
                 renderEncoder.label = "MyRenderEncoder"
                 
                 drawCapturedImage(renderEncoder: renderEncoder)
-                drawAnchorGeometry(renderEncoder: renderEncoder)
+//                drawAnchorGeometry(renderEncoder: renderEncoder)
                 drawFirework(renderEncoder: renderEncoder)
-                
-                
                 
                 // We're done encoding commands
                 renderEncoder.endEncoding()
@@ -523,9 +521,11 @@ class Renderer {
         sharedUniformBufferAddress = sharedUniformBuffer.contents().advanced(by: sharedUniformBufferOffset)
         anchorUniformBufferAddress = anchorUniformBuffer.contents().advanced(by: anchorUniformBufferOffset)
         
+//        fireworkParticleBufferInOffset = kAlignedParticleBufferSize * uniformBufferIndex
+//        fireworkParticleBufferOutOffset = kAlignedParticleBufferSize * uniformBufferIndex
+        
         fireworkParticleBufferInAddress = nowBuffIn.contents()
         fireworkParticleBufferOutAddress = nowBuffOut.contents()
-   
         fireworkUniformBufferAddresses = fireworkUniformBuffer.contents().advanced(by: kAlignedParticleSharedUniformsSize * uniformBufferIndex)
     }
     
@@ -547,8 +547,16 @@ class Renderer {
     }
     
     func updateSharedUniforms(frame: ARFrame) {
-        // Update the shared uniforms of the frame
+        let sharedFireworkUniformPtr = fireworkUniformBufferAddresses.assumingMemoryBound(to: SharedFireworkUniforms.self)
+        let newCoordinates = frame.camera.transform * vector_float4(0.0, 0.0, 0.0, 1.0)
+
+        sharedFireworkUniformPtr.pointee.mouse.position = vector_float3(
+            newCoordinates.x,
+            newCoordinates.y,
+            newCoordinates.z - 2.0
+        )
         
+        // Update the shared uniforms of the frame
         let uniforms = sharedUniformBufferAddress.assumingMemoryBound(to: SharedUniforms.self)
         
         uniforms.pointee.viewMatrix = simd_inverse(frame.camera.transform)
@@ -591,6 +599,7 @@ class Renderer {
             coordinateSpaceTransform.columns.2.z = -1.0
             
             let modelMatrix = simd_mul(anchor.transform, coordinateSpaceTransform)
+            let viewMatrix = simd_inverse(frame.camera.transform)
             
             let anchorUniforms = anchorUniformBufferAddress.assumingMemoryBound(to: InstanceUniforms.self).advanced(by: index)
             anchorUniforms.pointee.modelMatrix = modelMatrix
