@@ -216,22 +216,24 @@ kernel void fireworkComputeShader(
         diff = normalize(diff);
         diff = diff * strength * -0.083;
         
-        thisParticle.velocity = thisParticle.velocity + diff * 2;
+        
+        thisParticle.velocity = thisParticle.velocity + diff * 4;
         thisParticle.position = thisParticle.position + thisParticle.velocity;
         
         if (distance > 18 || length(diff) > 0.5) {
             thisParticle = slowDown(thisParticle);
         }
+        
+//        if (uniforms.renderMode == 2) {
+//            thisParticle = speedUp(thisParticle);
+//        }
     
     } else {
         Particle headParticle = in[id - 1];
         thisParticle.position = headParticle.position - headParticle.velocity * 2.5;
     }
     
-    if (uniforms.renderMode == -1) {
-        thisParticle.position = float3(thisParticle.startPos);
-        thisParticle.velocity = 0.0;
-    }
+    
     
     //mass
     out[id].position = thisParticle.position;
@@ -286,6 +288,6 @@ fragment half4 particle_fragment(
     return half4(
                  interpolated.color.x,
                  interpolated.color.y,
-                 interpolated.color.z, 1.0);
+                 interpolated.color.z, 0.8);
 }
 

@@ -31,7 +31,7 @@ class ViewController: UIViewController, MTKViewDelegate, ARSessionDelegate {
             view.device = MTLCreateSystemDefaultDevice()
             view.backgroundColor = UIColor.clear
             view.delegate = self
-            view.preferredFramesPerSecond = 120
+            view.preferredFramesPerSecond = 60
             
             guard view.device != nil else {
                 print("Metal is not supported on this device")
